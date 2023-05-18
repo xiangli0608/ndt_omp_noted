@@ -42,6 +42,7 @@
 
 #include <pcl/registration/boost.h>
 #include <pcl/registration/exceptions.h>
+
 #include <atomic>
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -261,9 +262,9 @@ void pclomp::GeneralizedIterativeClosestPoint<PointSource, PointTarget>::
 
 ////////////////////////////////////////////////////////////////////////////////////////
 template <typename PointSource, typename PointTarget>
-inline double pclomp::GeneralizedIterativeClosestPoint<
-    PointSource, PointTarget>::OptimizationFunctorWithIndices::
-operator()(const Vector6d& x) {
+inline double
+pclomp::GeneralizedIterativeClosestPoint<PointSource, PointTarget>::
+    OptimizationFunctorWithIndices::operator()(const Vector6d& x) {
   Eigen::Matrix4f transformation_matrix = gicp_->base_transformation_;
   gicp_->applyState(transformation_matrix, x);
   double f = 0;

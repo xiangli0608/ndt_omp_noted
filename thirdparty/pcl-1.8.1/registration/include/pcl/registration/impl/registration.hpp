@@ -80,6 +80,7 @@ pcl::Registration<PointSource, PointTarget, Scalar>::initCompute ()
   // Only update target kd-tree if a new target cloud was set
   if (target_cloud_updated_ && !force_no_recompute_)
   {
+    // 对kdtree进行初始化 ？ ndt_omp 里有没用这个, 但是还是对kdtree进行初始化了
     tree_->setInputCloud (target_);
     target_cloud_updated_ = false;
   }

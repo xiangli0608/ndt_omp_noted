@@ -40,8 +40,10 @@
 
 #include <pcl/common/common.h>
 #include <pcl/filters/boost.h>
+
 #include <Eigen/Cholesky>
 #include <Eigen/Dense>
+
 #include "voxel_grid_covariance_omp.h"
 
 //////////////////////////////////////////////////////////////////////////////////////////

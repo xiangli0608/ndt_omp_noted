@@ -43,6 +43,7 @@
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/pcl_macros.h>
 #include <pcl/point_types.h>
+
 #include <map>
 #include <unordered_map>
 
@@ -502,4 +503,4 @@ class VoxelGridCovariance : public pcl::VoxelGrid<PointT> {
 };
 }  // namespace pclomp
 
-#endif  //#ifndef PCL_VOXEL_GRID_COVARIANCE_H_
+#endif  // #ifndef PCL_VOXEL_GRID_COVARIANCE_H_

@@ -139,10 +139,12 @@ template <typename PointT> bool
 pcl::PCLBase<PointT>::initCompute ()
 {
   // Check if input was set
+  // 如果没设置 source_cloud, 返回false
   if (!input_)
     return (false);
 
   // If no point indices have been given, construct a set of indices for the entire input point cloud
+  // 如果未给出点索引, 则为整个输入点云构建一组索引
   if (!indices_)
   {
     fake_indices_ = true;
@@ -166,6 +168,7 @@ pcl::PCLBase<PointT>::initCompute ()
     for (size_t i = indices_size; i < indices_->size (); ++i) { (*indices_)[i] = static_cast<int>(i); }
   }
 
+  // 初始化完成
   return (true);
 }
 

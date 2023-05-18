@@ -374,4 +374,4 @@ class GeneralizedIterativeClosestPoint
 };
 }  // namespace pclomp
 
-#endif  //#ifndef PCL_GICP_H_
+#endif  // #ifndef PCL_GICP_H_

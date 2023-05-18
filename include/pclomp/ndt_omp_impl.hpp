@@ -89,10 +89,16 @@ pclomp::NormalDistributionsTransform<
   gauss_d2_ =
       -2 * log((-log(gauss_c1 * exp(-0.5) + gauss_c2) - gauss_d3_) / gauss_d1_);
 
+  // 默认 transformation_epsilon_ 为 0.1
   transformation_epsilon_ = 0.1;
+
+  // 最大迭代次数默认为 35
   max_iterations_ = 35;
 
+  // 搜索方法默认是 DIRECT7
   search_method = DIRECT7;
+
+  // 默认使用的线程数是最大线程数
   num_threads_ = omp_get_max_threads();
 }
 
