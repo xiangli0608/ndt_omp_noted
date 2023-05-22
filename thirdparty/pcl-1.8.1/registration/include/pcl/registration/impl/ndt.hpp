@@ -131,16 +131,21 @@ void pcl::NormalDistributionsTransform<PointSource, PointTarget>::
   Eigen::Vector3f init_translation = eig_transformation.translation();
   Eigen::Vector3f init_rotation =
       eig_transformation.rotation().eulerAngles(0, 1, 2);
+  // p是位置与角度的初值
   p << init_translation(0), init_translation(1), init_translation(2),
       init_rotation(0), init_rotation(1), init_rotation(2);
 
+  // 这次计算的hessian矩阵
   Eigen::Matrix<double, 6, 6> hessian;
 
+  // 点云的最终得分
   double score = 0;
+  // 步长的norm
   double delta_p_norm;
 
   // Calculate derivates of initial transform vector, subsequent derivative
   // calculations are done in the step length determination.
+  // 根据初值计算第一次得分和梯度与hessian
   score = computeDerivatives(score_gradient, hessian, output, p);
 
   while (!converged_) {
@@ -152,6 +157,7 @@ void pcl::NormalDistributionsTransform<PointSource, PointTarget>::
     Eigen::JacobiSVD<Eigen::Matrix<double, 6, 6> > sv(
         hessian, Eigen::ComputeFullU | Eigen::ComputeFullV);
     // Negative for maximization as opposed to minimization
+    // 根据 H * delet_x = -g， 求解出 delet_x
     delta_p = sv.solve(-score_gradient);
 
     // Calculate step length with guarnteed sufficient decrease [More, Thuente
@@ -182,6 +188,7 @@ void pcl::NormalDistributionsTransform<PointSource, PointTarget>::
                                  Eigen::Vector3f::UnitZ()))
             .matrix();
 
+    // 更新坐标
     p = p + delta_p;
 
     // Update Visualizer (untested)
@@ -205,6 +212,7 @@ void pcl::NormalDistributionsTransform<PointSource, PointTarget>::
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// 根据初值计算点云的得分与梯度
 template <typename PointSource, typename PointTarget>
 double
 pcl::NormalDistributionsTransform<PointSource, PointTarget>::computeDerivatives(
@@ -225,36 +233,45 @@ pcl::NormalDistributionsTransform<PointSource, PointTarget>::computeDerivatives(
   double score = 0;
 
   // Precompute Angular Derivatives (eq. 6.19 and 6.21)[Magnusson 2009]
+  // 预先计算一下角度相关的计算JE和HE时需要的几个数据
   computeAngleDerivatives(p);
 
   // Update gradient and hessian for each point, line 17 in Algorithm 2
   // [Magnusson 2009]
+  // 对经过初值变换后的点云的每个点进行遍历
   for (size_t idx = 0; idx < input_->points.size(); idx++) {
     x_trans_pt = trans_cloud.points[idx];
 
     // Find nieghbors (Radius search has been experimentally faster than direct
     // neighbor checking.
+    // 做一下最近邻搜索，找到离这个点比较接近的几个栅格 ??? 是包含还是最近邻
     std::vector<TargetGridLeafConstPtr> neighborhood;
     std::vector<float> distances;
     target_cells_.radiusSearch(x_trans_pt, resolution_, neighborhood,
                                distances);
 
+    // 再对搜出来的这些栅格做遍历
     for (typename std::vector<TargetGridLeafConstPtr>::iterator
              neighborhood_it = neighborhood.begin();
          neighborhood_it != neighborhood.end(); neighborhood_it++) {
+      // 取出这个栅格
       cell = *neighborhood_it;
+      // 原始点云中这个点的坐标
       x_pt = input_->points[idx];
       x = Eigen::Vector3d(x_pt.x, x_pt.y, x_pt.z);
 
+      // 变换之后的点云中这个点的坐标
       x_trans = Eigen::Vector3d(x_trans_pt.x, x_trans_pt.y, x_trans_pt.z);
 
       // Denorm point, x_k' in Equations 6.12 and 6.13 [Magnusson 2009]
+      // 减去这个cell中的均值
       x_trans -= cell->getMean();
       // Uses precomputed covariance for speed.
       c_inv = cell->getInverseCov();
 
       // Compute derivative of transform function w.r.t. transform vector, J_E
       // and H_E in Equations 6.18 and 6.20 [Magnusson 2009]
+      // 根据公式6.18 到 6.20 计算J_E和H_E
       computePointDerivatives(x);
       // Update score, gradient and hessian, lines 19-21 in Algorithm 2,
       // according to Equations 6.10, 6.12 and 6.13, respectively [Magnusson
@@ -267,12 +284,15 @@ pcl::NormalDistributionsTransform<PointSource, PointTarget>::computeDerivatives(
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// 根据旋转(z-y-x顺序)变换矩阵求出的JE与HE需要的一些变量
 template <typename PointSource, typename PointTarget>
 void pcl::NormalDistributionsTransform<PointSource, PointTarget>::
     computeAngleDerivatives(Eigen::Matrix<double, 6, 1> &p,
                             bool compute_hessian) {
   // Simplified math for near 0 angles
+  // cx是指cos(x) , sx是指 sin(x)
   double cx, cy, cz, sx, sy, sz;
+  // 由于角度非常小时，cos和sin可以约等于1和0
   if (fabs(p(3)) < 10e-5) {
     // p(3) = 0;
     cx = 1.0;
@@ -301,6 +321,7 @@ void pcl::NormalDistributionsTransform<PointSource, PointTarget>::
 
   // Precomputed angular gradiant components. Letters correspond to
   // Equation 6.19 [Magnusson 2009]
+  // 公式6.18和6.19
   j_ang_a_ << (-sx * sz + cx * sy * cz), (-sx * cz - cx * sy * sz), (-cx * cy);
   j_ang_b_ << (cx * sz + sx * sy * cz), (cx * cz - sx * sy * sz), (-sx * cy);
   j_ang_c_ << (-sy * cz), sy * sz, cy;
@@ -313,6 +334,7 @@ void pcl::NormalDistributionsTransform<PointSource, PointTarget>::
   if (compute_hessian) {
     // Precomputed angular hessian components. Letters correspond to
     // Equation 6.21 and numbers correspond to row index [Magnusson 2009]
+    // // 公式6.20和6.21
     h_ang_a2_ << (-cx * sz - sx * sy * cz), (-cx * cz + sx * sy * sz), sx * cy;
     h_ang_a3_ << (-sx * sz + cx * sy * cz), (-cx * sy * sz - sx * cz),
         (-cx * cy);
@@ -338,6 +360,7 @@ void pcl::NormalDistributionsTransform<PointSource, PointTarget>::
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// 根据公司6.18-6.20计算出JE和HE
 template <typename PointSource, typename PointTarget>
 void pcl::NormalDistributionsTransform<
     PointSource, PointTarget>::computePointDerivatives(Eigen::Vector3d &x,
@@ -345,6 +368,7 @@ void pcl::NormalDistributionsTransform<
   // Calculate first derivative of Transformation Equation 6.17 w.r.t. transform
   // vector p. Derivative w.r.t. ith element of transform vector corresponds to
   // column i, Equation 6.18 and 6.19 [Magnusson 2009]
+  // 根据公式6.18和6.19计算出 T 对 p 的导数
   point_gradient_(1, 3) = x.dot(j_ang_a_);
   point_gradient_(2, 3) = x.dot(j_ang_b_);
   point_gradient_(0, 4) = x.dot(j_ang_c_);
@@ -357,7 +381,8 @@ void pcl::NormalDistributionsTransform<
   if (compute_hessian) {
     // Vectors from Equation 6.21 [Magnusson 2009]
     Eigen::Vector3d a, b, c, d, e, f;
-
+    
+    // 根据公式6.20和6.21计算出 T 对 p 的二阶偏导数
     a << 0, x.dot(h_ang_a2_), x.dot(h_ang_a3_);
     b << 0, x.dot(h_ang_b2_), x.dot(h_ang_b3_);
     c << 0, x.dot(h_ang_c2_), x.dot(h_ang_c3_);
@@ -382,6 +407,7 @@ void pcl::NormalDistributionsTransform<
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// 计算出这个点在这个栅格上的得分
 template <typename PointSource, typename PointTarget>
 double
 pcl::NormalDistributionsTransform<PointSource, PointTarget>::updateDerivatives(
@@ -391,17 +417,21 @@ pcl::NormalDistributionsTransform<PointSource, PointTarget>::updateDerivatives(
   Eigen::Vector3d cov_dxd_pi;
   // e^(-d_2/2 * (x_k - mu_k)^T Sigma_k^-1 (x_k - mu_k)) Equation 6.9 [Magnusson
   // 2009]
-  double e_x_cov_x = exp(-gauss_d2_ * x_trans.dot(c_inv * x_trans) / 2);
   // Calculate probability of transtormed points existance, Equation 6.9
   // [Magnusson 2009]
+
+  // 根据公式6.9计算出这个点在这个栅格上的得分
+  double e_x_cov_x = exp(-gauss_d2_ * x_trans.dot(c_inv * x_trans) / 2);
   double score_inc = -gauss_d1_ * e_x_cov_x;
 
+  // 左乘个d2
   e_x_cov_x = gauss_d2_ * e_x_cov_x;
 
   // Error checking for invalid values.
   if (e_x_cov_x > 1 || e_x_cov_x < 0 || e_x_cov_x != e_x_cov_x) return (0);
 
   // Reusable portion of Equation 6.12 and 6.13 [Magnusson 2009]
+  // 再左乘个d1
   e_x_cov_x *= gauss_d1_;
 
   for (int i = 0; i < 6; i++) {
@@ -410,11 +440,13 @@ pcl::NormalDistributionsTransform<PointSource, PointTarget>::updateDerivatives(
     cov_dxd_pi = c_inv * point_gradient_.col(i);
 
     // Update gradient, Equation 6.12 [Magnusson 2009]
+    // 根据公式6.12计算出梯度
     score_gradient(i) += x_trans.dot(cov_dxd_pi) * e_x_cov_x;
 
     if (compute_hessian) {
       for (int j = 0; j < hessian.cols(); j++) {
         // Update hessian, Equation 6.13 [Magnusson 2009]
+        // 根据公式6.13计算出hessian矩阵
         hessian(i, j) +=
             e_x_cov_x *
             (-gauss_d2_ * x_trans.dot(cov_dxd_pi) *
@@ -429,6 +461,7 @@ pcl::NormalDistributionsTransform<PointSource, PointTarget>::updateDerivatives(
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// 这个函数与 computeDerivatives 基本一样，只不过没有计算得分与梯度
 template <typename PointSource, typename PointTarget>
 void pcl::NormalDistributionsTransform<PointSource, PointTarget>::
     computeHessian(Eigen::Matrix<double, 6, 6> &hessian,
@@ -487,6 +520,7 @@ void pcl::NormalDistributionsTransform<PointSource, PointTarget>::
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// 这个函数与 updateHessian 函数基本一样，只不过没有计算梯度
 template <typename PointSource, typename PointTarget>
 void pcl::NormalDistributionsTransform<PointSource, PointTarget>::updateHessian(
     Eigen::Matrix<double, 6, 6> &hessian, Eigen::Vector3d &x_trans,
@@ -642,6 +676,7 @@ double pcl::NormalDistributionsTransform<
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// 计算步长
 template <typename PointSource, typename PointTarget>
 double pcl::NormalDistributionsTransform<PointSource, PointTarget>::
     computeStepLengthMT(const Eigen::Matrix<double, 6, 1> &x,
