@@ -344,7 +344,8 @@ void pcl::VoxelGridCovariance<PointT>::applyFilter(PointCloud& output) {
       if (searchable_)
         voxel_centroids_leaf_indices_.push_back(static_cast<int>(it->first));
 
-      // Single pass covariance calculation
+      // Single-Pass Covariance Matrix Calculation on a Hybrid FPGA/CPU Platform
+      // Lukas On Arnold 1,∗ and Muhsen Owaida 2
       // 这竟然是一篇论文。。。看论文没看明白公式咋推出来的，之后再看看
       leaf.cov_ =
           (leaf.cov_ - 2 * (pt_sum * leaf.mean_.transpose())) / leaf.nr_points +
